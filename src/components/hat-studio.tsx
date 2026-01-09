@@ -13,6 +13,7 @@ import {
   Share2,
   Send,
   Copy,
+  Wallet,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -48,6 +49,7 @@ export default function HatStudio() {
   const [hatState, setHatState] = useState<HatState>({ x: 50, y: 10, scale: 0.3, rotation: 0 });
   const [suggestedSizes, setSuggestedSizes] = useState<string[] | null>(null);
   const [selectedHat, setSelectedHat] = useState<ImagePlaceholder>(PlaceHolderImages[0]);
+  const [isWalletConnected, setIsWalletConnected] = useState(false);
   const { toast } = useToast();
 
   const editorRef = useRef<HTMLDivElement>(null);
@@ -59,7 +61,18 @@ export default function HatStudio() {
     setHatState({ x: 50, y: 10, scale: 0.3, rotation: 0 });
     setSuggestedSizes(null);
     setSelectedHat(PlaceHolderImages[0]);
+    // We don't reset wallet connection on "Start Over"
   }, []);
+
+  const handleConnectWallet = () => {
+    // In a real app, you'd use a library like ethers.js or web3-react to connect to a wallet.
+    // For this prototype, we'll just simulate it.
+    setIsWalletConnected(true);
+    toast({
+      title: 'Wallet Connected',
+      description: 'You can now upload your photo.',
+    });
+  };
 
   const handleFile = useCallback(async (file: File) => {
     if (!SUPPORTED_FORMATS.includes(file.type)) {
@@ -184,7 +197,11 @@ export default function HatStudio() {
         );
       case 'upload':
       default:
-        return <ImageUploader onFileSelect={handleFile} />;
+        return isWalletConnected ? (
+          <ImageUploader onFileSelect={handleFile} />
+        ) : (
+          <ConnectWallet onConnect={handleConnectWallet} />
+        );
     }
   };
 
@@ -204,6 +221,24 @@ export default function HatStudio() {
     </div>
   );
 }
+
+const ConnectWallet = ({ onConnect }: { onConnect: () => void }) => {
+  return (
+    <Card className="w-full max-w-2xl mx-auto">
+      <CardContent className="p-8 md:p-16 flex flex-col items-center justify-center">
+        <Wallet className="w-16 h-16 text-muted-foreground" />
+        <p className="mt-4 font-semibold text-foreground">
+          Connect your wallet to begin
+        </p>
+        <p className="text-muted-foreground text-sm">You need to connect your wallet to upload a photo.</p>
+        <Button onClick={onConnect} size="lg" className="mt-6 rounded-lg py-6 text-base">
+          <Wallet className="mr-2 h-5 w-5" /> Connect Wallet
+        </Button>
+      </CardContent>
+    </Card>
+  );
+};
+
 
 const ImageUploader = ({ onFileSelect }: { onFileSelect: (file: File) => void }) => {
   const [isDragging, setIsDragging] = useState(false);

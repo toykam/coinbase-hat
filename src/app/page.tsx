@@ -1,3 +1,9 @@
+import HatStudio from '@/components/hat-studio';
+
 export default function Home() {
-  return <></>;
+  return (
+    <main className="container mx-auto px-4 py-8">
+      <HatStudio />
+    </main>
+  );
 }

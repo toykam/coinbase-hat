@@ -1,3 +1,10 @@
 {
-  "placeholderImages": []
+  "placeholderImages": [
+    {
+      "id": "coinbase-hat",
+      "description": "A blue hat with a transparent background.",
+      "imageUrl": "https://www.pngall.com/wp-content/uploads/5/Blue-Hat-PNG.png",
+      "imageHint": "blue hat"
+    }
+  ]
 }

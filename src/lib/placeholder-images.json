@@ -4,7 +4,33 @@
       "id": "coinbase-hat",
       "description": "A blue hat with 'PROOF OF HAT' text.",
       "imageUrl": "/coinbase-hat.png",
-      "imageHint": "blue hat"
+      "imageHint": "blue hat",
+      "width": 400,
+      "height": 350
+    },
+    {
+      "id": "top-hat",
+      "description": "A classic black top hat.",
+      "imageUrl": "https://images.unsplash.com/photo-1662137897341-4626aed88c1d?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHwyfHx0b3AlMjBoYXR8ZW58MHx8fHwxNzY3OTUzOTU5fDA&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "top hat",
+      "width": 400,
+      "height": 400
+    },
+    {
+      "id": "cowboy-hat",
+      "description": "A brown cowboy hat.",
+      "imageUrl": "https://images.unsplash.com/photo-1720293937341-62243dd9b217?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHw3fHxjb3dib3klMjBoYXR8ZW58MHx8fHwxNzY3OTkyOTA4fDA&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "cowboy hat",
+      "width": 500,
+      "height": 350
+    },
+    {
+      "id": "beanie",
+      "description": "A warm winter beanie.",
+      "imageUrl": "https://images.unsplash.com/photo-1419179755747-14e631575162?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHw0fHxiZWFuaWUlMjBoYXR8ZW58MHx8fHwxNzY3OTkyOTA4fDA&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "beanie hat",
+      "width": 300,
+      "height": 300
     }
   ]
 }

@@ -19,8 +19,15 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Slider } from '@/components/ui/slider';
 import { useToast } from '@/hooks/use-toast';
 import { getHatSuggestions } from '@/app/actions';
-import { PlaceHolderImages } from '@/lib/placeholder-images';
+import { PlaceHolderImages, ImagePlaceholder } from '@/lib/placeholder-images';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import {
+  Carousel,
+  CarouselContent,
+  CarouselItem,
+  CarouselNext,
+  CarouselPrevious,
+} from '@/components/ui/carousel';
 
 type Stage = 'upload' | 'edit' | 'loading';
 type HatState = {
@@ -29,10 +36,6 @@ type HatState = {
   scale: number;
   rotation: number;
 };
-
-const hatImagePlaceholder = PlaceHolderImages.find(img => img.id === 'coinbase-hat');
-const HAT_URL = hatImagePlaceholder?.imageUrl || '';
-const HAT_ASPECT_RATIO = 400 / 350; // Approximate aspect ratio of the blue hat png
 
 const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
 const SUPPORTED_FORMATS = ['image/jpeg', 'image/png', 'image/webp'];
@@ -44,6 +47,7 @@ export default function HatStudio() {
   const [imageDimensions, setImageDimensions] = useState<{ width: number; height: number } | null>(null);
   const [hatState, setHatState] = useState<HatState>({ x: 50, y: 10, scale: 0.3, rotation: 0 });
   const [suggestedSizes, setSuggestedSizes] = useState<string[] | null>(null);
+  const [selectedHat, setSelectedHat] = useState<ImagePlaceholder>(PlaceHolderImages[0]);
   const { toast } = useToast();
 
   const editorRef = useRef<HTMLDivElement>(null);
@@ -54,6 +58,7 @@ export default function HatStudio() {
     setImageDimensions(null);
     setHatState({ x: 50, y: 10, scale: 0.3, rotation: 0 });
     setSuggestedSizes(null);
+    setSelectedHat(PlaceHolderImages[0]);
   }, []);
 
   const handleFile = useCallback(async (file: File) => {
@@ -96,13 +101,14 @@ export default function HatStudio() {
           setSuggestedSizes(['small', 'medium', 'large']);
         }
         
-        setHatState(prev => ({ ...prev, x: (img.width / 2) - (img.width * prev.scale * HAT_ASPECT_RATIO / 2), y: img.height * 0.1 }));
+        const hatAspectRatio = selectedHat.width / selectedHat.height;
+        setHatState(prev => ({ ...prev, x: (img.width / 2) - (img.width * prev.scale * hatAspectRatio / 2), y: img.height * 0.1 }));
         setStage('edit');
       };
       img.src = e.target?.result as string;
     };
     reader.readAsDataURL(file);
-  }, [toast]);
+  }, [toast, selectedHat]);
   
   const handleDownload = useCallback(() => {
     if (!uploadedImage || !imageDimensions || !editorRef.current) {
@@ -126,8 +132,9 @@ export default function HatStudio() {
         const hatImage = new window.Image();
         hatImage.crossOrigin = 'anonymous';
         hatImage.onload = () => {
+            const hatAspectRatio = selectedHat.width / selectedHat.height;
             const hatWidth = imageDimensions.width * hatState.scale;
-            const hatHeight = hatWidth / HAT_ASPECT_RATIO;
+            const hatHeight = hatWidth / hatAspectRatio;
             const hatCenterX = hatState.x + hatWidth / 2;
             const hatCenterY = hatState.y + hatHeight / 2;
             
@@ -143,10 +150,10 @@ export default function HatStudio() {
             link.href = canvas.toDataURL('image/png');
             link.click();
         };
-        hatImage.src = HAT_URL;
+        hatImage.src = selectedHat.imageUrl;
     };
     baseImage.src = uploadedImage;
-}, [uploadedImage, imageDimensions, hatState, toast]);
+}, [uploadedImage, imageDimensions, hatState, toast, selectedHat]);
 
   const handleCopyAddress = () => {
     navigator.clipboard.writeText(CONTRACT_ADDRESS);
@@ -171,6 +178,8 @@ export default function HatStudio() {
             suggestedSizes={suggestedSizes}
             imageDimensions={imageDimensions!}
             editorRef={editorRef}
+            selectedHat={selectedHat}
+            setSelectedHat={setSelectedHat}
           />
         );
       case 'upload':
@@ -272,7 +281,9 @@ const Editor = ({
   onReset,
   suggestedSizes,
   imageDimensions,
-  editorRef
+  editorRef,
+  selectedHat,
+  setSelectedHat,
 }: {
   uploadedImage: string;
   hatState: HatState;
@@ -282,9 +293,12 @@ const Editor = ({
   suggestedSizes: string[] | null;
   imageDimensions: { width: number; height: number };
   editorRef: React.RefObject<HTMLDivElement>;
+  selectedHat: ImagePlaceholder;
+  setSelectedHat: (hat: ImagePlaceholder) => void;
 }) => {
   const isDraggingRef = useRef(false);
   const dragStartRef = useRef({ x: 0, y: 0, hatX: 0, hatY: 0 });
+  const hatAspectRatio = selectedHat.width / selectedHat.height;
 
   const handleMouseDown = (e: React.MouseEvent<HTMLDivElement>) => {
     e.preventDefault();
@@ -345,13 +359,37 @@ const Editor = ({
                 transformOrigin: 'center',
               }}
             >
-              <Image src={HAT_URL} alt="Hat" layout="responsive" width={400} height={350} />
+              <Image src={selectedHat.imageUrl} alt={selectedHat.description} layout="responsive" width={selectedHat.width} height={selectedHat.height} />
             </div>
           </CardContent>
         </Card>
       </div>
       <Card className="w-full lg:w-80 flex-shrink-0 shadow-lg">
         <CardContent className="p-6 flex flex-col gap-6 text-left">
+          <div>
+            <label className="text-sm font-medium text-foreground mb-2">Select Hat</label>
+            <Carousel className="w-full max-w-xs mx-auto mt-2">
+              <CarouselContent>
+                {PlaceHolderImages.map((hat, index) => (
+                  <CarouselItem key={index} className="basis-1/3">
+                    <div className="p-1">
+                      <Card
+                        className={`cursor-pointer ${selectedHat.id === hat.id ? 'border-primary' : ''}`}
+                        onClick={() => setSelectedHat(hat)}
+                      >
+                        <CardContent className="flex aspect-square items-center justify-center p-1">
+                           <Image src={hat.imageUrl} alt={hat.description} width={hat.width} height={hat.height} className="rounded-md" />
+                        </CardContent>
+                      </Card>
+                    </div>
+                  </CarouselItem>
+                ))}
+              </CarouselContent>
+              <CarouselPrevious />
+              <CarouselNext />
+            </Carousel>
+          </div>
+
           {suggestedSizes && (
             <Alert>
               <Wand2 className="h-4 w-4" />
@@ -370,7 +408,7 @@ const Editor = ({
               value={[hatState.scale]}
               onValueChange={([val]) => setHatState(prev => ({ ...prev, scale: val }))}
               min={0.05}
-              max={1}
+              max={2}
               step={0.01}
             />
           </div>

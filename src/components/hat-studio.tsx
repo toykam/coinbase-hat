@@ -12,6 +12,7 @@ import {
   Rotate3d,
   Share2,
   Send,
+  Copy,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -35,6 +36,7 @@ const HAT_ASPECT_RATIO = 400 / 350; // Approximate aspect ratio of the blue hat 
 
 const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
 const SUPPORTED_FORMATS = ['image/jpeg', 'image/png', 'image/webp'];
+const CONTRACT_ADDRESS = '0x089480267d1B22bDB9027091b1d7Ea12c56097E9';
 
 export default function HatStudio() {
   const [stage, setStage] = useState<Stage>('upload');
@@ -146,6 +148,13 @@ export default function HatStudio() {
     baseImage.src = uploadedImage;
 }, [uploadedImage, imageDimensions, hatState, toast]);
 
+  const handleCopyAddress = () => {
+    navigator.clipboard.writeText(CONTRACT_ADDRESS);
+    toast({
+      title: 'Copied!',
+      description: 'Contract address copied to clipboard.',
+    });
+  };
 
   const renderContent = () => {
     switch (stage) {
@@ -172,10 +181,16 @@ export default function HatStudio() {
 
   return (
     <div className="flex flex-col items-center text-center">
-      <h1 className="text-4xl md:text-5xl font-bold text-foreground">Coinbase Hat Studio</h1>
+      <h1 className="text-4xl md:text-5xl font-bold text-foreground">Proof Of Hat Studio</h1>
       <p className="mt-4 text-lg text-muted-foreground max-w-2xl">
         Upload a photo, place a hat on your head, and download your new look. It's that simple!
       </p>
+       <div className="mt-4 flex items-center gap-2 rounded-lg bg-card border p-2 px-4">
+          <span className="text-sm font-mono text-muted-foreground truncate">CA: {CONTRACT_ADDRESS}</span>
+          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={handleCopyAddress}>
+            <Copy className="h-4 w-4" />
+          </Button>
+        </div>
       <div className="w-full mt-8">{renderContent()}</div>
     </div>
   );

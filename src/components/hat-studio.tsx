@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useRef, useCallback, useEffect } from 'react';
+import React, { useState, useRef, useCallback } from 'react';
 import Image from 'next/image';
 import {
   UploadCloud,
@@ -10,8 +10,8 @@ import {
   Wand2,
   Scale,
   Rotate3d,
-  AlertCircle,
   Share2,
+  Send,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -309,6 +309,10 @@ const Editor = ({
     window.open(url, '_blank');
   };
 
+  const handleTelegramShare = () => {
+    window.open('https://t.me/ProofOfHatBase', '_blank');
+  }
+
   return (
     <div className="flex flex-col lg:flex-row gap-8">
       <div className="flex-grow flex items-center justify-center">
@@ -373,9 +377,14 @@ const Editor = ({
             <Button onClick={onDownload} size="lg" className="rounded-lg py-6 text-base">
               <Download className="mr-2 h-5 w-5" /> Download
             </Button>
-            <Button onClick={handleShare} size="lg" className="rounded-lg py-6 text-base" variant="outline">
-              <Share2 className="mr-2 h-5 w-5" /> Share on Twitter
-            </Button>
+            <div className="grid grid-cols-2 gap-2">
+              <Button onClick={handleShare} size="lg" className="rounded-lg py-6 text-base" variant="outline">
+                <Share2 className="mr-2 h-5 w-5" /> Twitter
+              </Button>
+              <Button onClick={handleTelegramShare} size="lg" className="rounded-lg py-6 text-base" variant="outline">
+                <Send className="mr-2 h-5 w-5" /> Telegram
+              </Button>
+            </div>
             <Button onClick={onReset} variant="outline" className="rounded-lg">
               <RotateCcw className="mr-2 h-4 w-4" /> Start Over
             </Button>

@@ -11,6 +11,7 @@ import {
   Scale,
   Rotate3d,
   AlertCircle,
+  Share2,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -301,6 +302,13 @@ const Editor = ({
     window.removeEventListener('mouseup', handleMouseUp);
   };
 
+  const handleShare = () => {
+    const text = encodeURIComponent("Check out my new hat! 0x089480267d1B22bDB9027091b1d7Ea12c56097E9");
+    const hashtags = "coinbasehat,proofofhat";
+    const url = `https://twitter.com/intent/tweet?text=${text}&hashtags=${hashtags}`;
+    window.open(url, '_blank');
+  };
+
   return (
     <div className="flex flex-col lg:flex-row gap-8">
       <div className="flex-grow flex items-center justify-center">
@@ -364,6 +372,9 @@ const Editor = ({
           <div className="flex flex-col gap-2 mt-4">
             <Button onClick={onDownload} size="lg" className="rounded-lg py-6 text-base">
               <Download className="mr-2 h-5 w-5" /> Download
+            </Button>
+            <Button onClick={handleShare} size="lg" className="rounded-lg py-6 text-base" variant="outline">
+              <Share2 className="mr-2 h-5 w-5" /> Share on Twitter
             </Button>
             <Button onClick={onReset} variant="outline" className="rounded-lg">
               <RotateCcw className="mr-2 h-4 w-4" /> Start Over

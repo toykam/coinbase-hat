@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useRef, useCallback } from 'react';
+import React, { useState, useRef, useCallback, useEffect } from 'react';
 import Image from 'next/image';
 import {
   UploadCloud,
@@ -29,9 +29,11 @@ import {
   CarouselNext,
   CarouselPrevious,
 } from '@/components/ui/carousel';
-import { BrowserProvider, Contract } from 'ethers';
+import { ConnectButton } from '@rainbow-me/rainbowkit';
+import { useAccount, useReadContract } from 'wagmi';
+import { parseUnits } from 'viem';
 
-type Stage = 'upload' | 'edit' | 'loading' | 'connecting';
+type Stage = 'upload' | 'edit' | 'loading';
 type HatState = {
   x: number;
   y: number;
@@ -43,9 +45,21 @@ const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
 const SUPPORTED_FORMATS = ['image/jpeg', 'image/png', 'image/webp'];
 const CONTRACT_ADDRESS = '0x089480267d1B22bDB9027091b1d7Ea12c56097E9';
 const TOKEN_ABI = [
-  'function balanceOf(address owner) view returns (uint256)',
-  'function totalSupply() view returns (uint256)',
-];
+  {
+    "constant": true,
+    "inputs": [{"name": "owner", "type": "address"}],
+    "name": "balanceOf",
+    "outputs": [{"name": "", "type": "uint256"}],
+    "type": "function"
+  },
+  {
+    "constant": true,
+    "inputs": [],
+    "name": "totalSupply",
+    "outputs": [{"name": "", "type": "uint256"}],
+    "type": "function"
+  }
+] as const;
 const MINIMUM_HOLDING_PERCENTAGE = 0.001; // 0.1%
 
 export default function HatStudio() {
@@ -55,10 +69,45 @@ export default function HatStudio() {
   const [hatState, setHatState] = useState<HatState>({ x: 50, y: 10, scale: 0.3, rotation: 0 });
   const [suggestedSizes, setSuggestedSizes] = useState<string[] | null>(null);
   const [selectedHat, setSelectedHat] = useState<ImagePlaceholder>(PlaceHolderImages[0]);
-  const [isWalletConnected, setIsWalletConnected] = useState(false);
+  const [isTokenHolder, setIsTokenHolder] = useState(false);
+  
   const { toast } = useToast();
+  const { address, isConnected } = useAccount();
 
   const editorRef = useRef<HTMLDivElement>(null);
+  
+  const { data: balance } = useReadContract({
+    address: CONTRACT_ADDRESS,
+    abi: TOKEN_ABI,
+    functionName: 'balanceOf',
+    args: [address!],
+    query: { enabled: !!address },
+  });
+
+  const { data: totalSupply } = useReadContract({
+    address: CONTRACT_ADDRESS,
+    abi: TOKEN_ABI,
+    functionName: 'totalSupply',
+  });
+
+  useEffect(() => {
+    if (balance !== undefined && totalSupply !== undefined && totalSupply > 0n) {
+      const requiredBalance = (totalSupply * BigInt(Math.floor(MINIMUM_HOLDING_PERCENTAGE * 10000))) / 10000n;
+      const hasEnough = balance >= requiredBalance;
+      setIsTokenHolder(hasEnough);
+
+      if(isConnected && !hasEnough) {
+        toast({
+          variant: 'destructive',
+          title: 'Insufficient Token Balance',
+          description: `You need to hold at least ${MINIMUM_HOLDING_PERCENTAGE * 100}% of the token supply to proceed.`,
+        });
+      }
+    } else {
+      setIsTokenHolder(false);
+    }
+  }, [balance, totalSupply, isConnected, toast]);
+
 
   const resetState = useCallback(() => {
     setStage('upload');
@@ -67,59 +116,7 @@ export default function HatStudio() {
     setHatState({ x: 50, y: 10, scale: 0.3, rotation: 0 });
     setSuggestedSizes(null);
     setSelectedHat(PlaceHolderImages[0]);
-    setIsWalletConnected(false);
   }, []);
-
-  const handleConnectWallet = async () => {
-    if (typeof window.ethereum === 'undefined') {
-      toast({
-        variant: 'destructive',
-        title: 'MetaMask not found',
-        description: 'Please install MetaMask to connect your wallet.',
-      });
-      return;
-    }
-
-    try {
-      setStage('connecting');
-      const provider = new BrowserProvider(window.ethereum);
-      const accounts = await provider.send('eth_requestAccounts', []);
-      const signer = await provider.getSigner(accounts[0]);
-      const address = await signer.getAddress();
-      
-      const tokenContract = new Contract(CONTRACT_ADDRESS, TOKEN_ABI, provider);
-      
-      const balance = await tokenContract.balanceOf(address);
-      const totalSupply = await tokenContract.totalSupply();
-      
-      const requiredBalance = (totalSupply * BigInt(MINIMUM_HOLDING_PERCENTAGE * 10000)) / BigInt(10000);
-
-      if (balance >= requiredBalance) {
-        setIsWalletConnected(true);
-        setStage('upload');
-        toast({
-          title: 'Wallet Connected',
-          description: 'You can now upload your photo.',
-        });
-      } else {
-        setStage('upload');
-        toast({
-          variant: 'destructive',
-          title: 'Insufficient Token Balance',
-          description: `You need to hold at least ${MINIMUM_HOLDING_PERCENTAGE * 100}% of the token supply to proceed.`,
-        });
-      }
-    } catch (error) {
-      console.error('Wallet connection failed:', error);
-      setStage('upload');
-      toast({
-        variant: 'destructive',
-        title: 'Wallet Connection Failed',
-        description: 'Something went wrong. Please try again.',
-      });
-    }
-  };
-
 
   const handleFile = useCallback(async (file: File) => {
     if (!SUPPORTED_FORMATS.includes(file.type)) {
@@ -170,7 +167,7 @@ export default function HatStudio() {
     reader.readAsDataURL(file);
   }, [toast, selectedHat]);
   
-  const handleDownload = useCallback(() => {
+  const generateImage = useCallback((callback: (dataUrl: string) => void) => {
     if (!uploadedImage || !imageDimensions || !editorRef.current) {
         return;
     }
@@ -205,15 +202,23 @@ export default function HatStudio() {
             ctx.drawImage(hatImage, hatState.x, hatState.y, hatWidth, hatHeight);
             ctx.restore();
 
-            const link = document.createElement('a');
-            link.download = 'hat-studio.png';
-            link.href = canvas.toDataURL('image/png');
-            link.click();
+            callback(canvas.toDataURL('image/png'));
         };
         hatImage.src = selectedHat.imageUrl;
     };
     baseImage.src = uploadedImage;
-}, [uploadedImage, imageDimensions, hatState, toast, selectedHat]);
+  }, [uploadedImage, imageDimensions, hatState, toast, selectedHat]);
+
+
+  const handleDownload = useCallback(() => {
+    generateImage((dataUrl) => {
+      const link = document.createElement('a');
+      link.download = 'hat-studio.png';
+      link.href = dataUrl;
+      link.click();
+    });
+  }, [generateImage]);
+
 
   const handleCopyAddress = () => {
     navigator.clipboard.writeText(CONTRACT_ADDRESS);
@@ -225,8 +230,6 @@ export default function HatStudio() {
 
   const renderContent = () => {
     switch (stage) {
-      case 'connecting':
-        return <ConnectingState />;
       case 'loading':
         return <LoadingState />;
       case 'edit':
@@ -242,20 +245,24 @@ export default function HatStudio() {
             editorRef={editorRef}
             selectedHat={selectedHat}
             setSelectedHat={setSelectedHat}
+            generateImage={generateImage}
           />
         );
       case 'upload':
       default:
-        return isWalletConnected ? (
+        return (isConnected && isTokenHolder) ? (
           <ImageUploader onFileSelect={handleFile} />
         ) : (
-          <ConnectWallet onConnect={handleConnectWallet} />
+          <ConnectWallet />
         );
     }
   };
 
   return (
     <div className="flex flex-col items-center text-center">
+      <div className="absolute top-4 right-4">
+        <ConnectButton />
+      </div>
       <h1 className="text-4xl md:text-5xl font-bold text-foreground">Proof Of Hat Studio</h1>
       <p className="mt-4 text-lg text-muted-foreground max-w-2xl">
         Upload a photo, place a hat on your head, and download your new look. It's that simple!
@@ -271,7 +278,7 @@ export default function HatStudio() {
   );
 }
 
-const ConnectWallet = ({ onConnect }: { onConnect: () => void }) => {
+const ConnectWallet = () => {
   return (
     <Card className="w-full max-w-2xl mx-auto">
       <CardContent className="p-8 md:p-16 flex flex-col items-center justify-center">
@@ -280,9 +287,9 @@ const ConnectWallet = ({ onConnect }: { onConnect: () => void }) => {
           Connect your wallet to begin
         </p>
         <p className="text-muted-foreground text-sm">You need to hold at least 0.1% of POH to upload a photo.</p>
-        <Button onClick={onConnect} size="lg" className="mt-6 rounded-lg py-6 text-base">
-          <Wallet className="mr-2 h-5 w-5" /> Connect Wallet
-        </Button>
+        <div className="mt-6">
+          <ConnectButton />
+        </div>
       </CardContent>
     </Card>
   );
@@ -350,13 +357,6 @@ const ImageUploader = ({ onFileSelect }: { onFileSelect: (file: File) => void })
   );
 };
 
-const ConnectingState = () => (
-  <div className="flex flex-col items-center justify-center p-16">
-    <LoaderCircle className="w-16 h-16 text-primary animate-spin" />
-    <p className="mt-4 text-lg text-muted-foreground">Connecting to your wallet...</p>
-  </div>
-);
-
 const LoadingState = () => (
   <div className="flex flex-col items-center justify-center p-16">
     <LoaderCircle className="w-16 h-16 text-primary animate-spin" />
@@ -375,6 +375,7 @@ const Editor = ({
   editorRef,
   selectedHat,
   setSelectedHat,
+  generateImage
 }: {
   uploadedImage: string;
   hatState: HatState;
@@ -386,7 +387,9 @@ const Editor = ({
   editorRef: React.RefObject<HTMLDivElement>;
   selectedHat: ImagePlaceholder;
   setSelectedHat: (hat: ImagePlaceholder) => void;
+  generateImage: (callback: (dataUrl: string) => void) => void;
 }) => {
+  const { toast } = useToast();
   const isDraggingRef = useRef(false);
   const dragStartRef = useRef({ x: 0, y: 0, hatX: 0, hatY: 0 });
   const hatAspectRatio = selectedHat.width / selectedHat.height;
@@ -423,10 +426,17 @@ const Editor = ({
   };
 
   const handleShare = () => {
-    const text = encodeURIComponent("Check out my new hat! 0x089480267d1B22bDB9027091b1d7Ea12c56097E9");
-    const hashtags = "coinbasehat,proofofhat";
-    const url = `https://twitter.com/intent/tweet?text=${text}&hashtags=${hashtags}`;
-    window.open(url, '_blank');
+    generateImage(() => {
+      toast({
+        title: "Image downloaded!",
+        description: "Attach the downloaded image to your tweet.",
+      });
+
+      const text = encodeURIComponent("Check out my new hat! 0x089480267d1B22bDB9027091b1d7Ea12c56097E9");
+      const hashtags = "coinbasehat,proofofhat";
+      const url = `https://twitter.com/intent/tweet?text=${text}&hashtags=${hashtags}`;
+      window.open(url, '_blank');
+    });
   };
 
   const handleTelegramShare = () => {

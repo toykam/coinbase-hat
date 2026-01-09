@@ -11,7 +11,7 @@
     {
       "id": "top-hat",
       "description": "A classic black top hat.",
-      "imageUrl": "/hats/coinbase-hat.png",
+      "imageUrl": "/hats/hat-2.png",
       "imageHint": "top hat",
       "width": 400,
       "height": 400
@@ -19,18 +19,10 @@
     {
       "id": "cowboy-hat",
       "description": "A brown cowboy hat.",
-      "imageUrl": "/hats/coinbase-hat.png",
+      "imageUrl": "/hats/hat-3.png",
       "imageHint": "cowboy hat",
       "width": 500,
       "height": 350
-    },
-    {
-      "id": "beanie",
-      "description": "A warm winter beanie.",
-      "imageUrl": "/hats/coinbase-hat.png",
-      "imageHint": "beanie hat",
-      "width": 300,
-      "height": 300
     }
   ]
 }

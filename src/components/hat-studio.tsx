@@ -29,8 +29,9 @@ import {
   CarouselNext,
   CarouselPrevious,
 } from '@/components/ui/carousel';
+import { BrowserProvider, Contract } from 'ethers';
 
-type Stage = 'upload' | 'edit' | 'loading';
+type Stage = 'upload' | 'edit' | 'loading' | 'connecting';
 type HatState = {
   x: number;
   y: number;
@@ -41,6 +42,11 @@ type HatState = {
 const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
 const SUPPORTED_FORMATS = ['image/jpeg', 'image/png', 'image/webp'];
 const CONTRACT_ADDRESS = '0x089480267d1B22bDB9027091b1d7Ea12c56097E9';
+const TOKEN_ABI = [
+  'function balanceOf(address owner) view returns (uint256)',
+  'function totalSupply() view returns (uint256)',
+];
+const MINIMUM_HOLDING_PERCENTAGE = 0.001; // 0.1%
 
 export default function HatStudio() {
   const [stage, setStage] = useState<Stage>('upload');
@@ -61,18 +67,59 @@ export default function HatStudio() {
     setHatState({ x: 50, y: 10, scale: 0.3, rotation: 0 });
     setSuggestedSizes(null);
     setSelectedHat(PlaceHolderImages[0]);
-    // We don't reset wallet connection on "Start Over"
+    setIsWalletConnected(false);
   }, []);
 
-  const handleConnectWallet = () => {
-    // In a real app, you'd use a library like ethers.js or web3-react to connect to a wallet.
-    // For this prototype, we'll just simulate it.
-    setIsWalletConnected(true);
-    toast({
-      title: 'Wallet Connected',
-      description: 'You can now upload your photo.',
-    });
+  const handleConnectWallet = async () => {
+    if (typeof window.ethereum === 'undefined') {
+      toast({
+        variant: 'destructive',
+        title: 'MetaMask not found',
+        description: 'Please install MetaMask to connect your wallet.',
+      });
+      return;
+    }
+
+    try {
+      setStage('connecting');
+      const provider = new BrowserProvider(window.ethereum);
+      const accounts = await provider.send('eth_requestAccounts', []);
+      const signer = await provider.getSigner(accounts[0]);
+      const address = await signer.getAddress();
+      
+      const tokenContract = new Contract(CONTRACT_ADDRESS, TOKEN_ABI, provider);
+      
+      const balance = await tokenContract.balanceOf(address);
+      const totalSupply = await tokenContract.totalSupply();
+      
+      const requiredBalance = (totalSupply * BigInt(MINIMUM_HOLDING_PERCENTAGE * 10000)) / BigInt(10000);
+
+      if (balance >= requiredBalance) {
+        setIsWalletConnected(true);
+        setStage('upload');
+        toast({
+          title: 'Wallet Connected',
+          description: 'You can now upload your photo.',
+        });
+      } else {
+        setStage('upload');
+        toast({
+          variant: 'destructive',
+          title: 'Insufficient Token Balance',
+          description: `You need to hold at least ${MINIMUM_HOLDING_PERCENTAGE * 100}% of the token supply to proceed.`,
+        });
+      }
+    } catch (error) {
+      console.error('Wallet connection failed:', error);
+      setStage('upload');
+      toast({
+        variant: 'destructive',
+        title: 'Wallet Connection Failed',
+        description: 'Something went wrong. Please try again.',
+      });
+    }
   };
+
 
   const handleFile = useCallback(async (file: File) => {
     if (!SUPPORTED_FORMATS.includes(file.type)) {
@@ -178,6 +225,8 @@ export default function HatStudio() {
 
   const renderContent = () => {
     switch (stage) {
+      case 'connecting':
+        return <ConnectingState />;
       case 'loading':
         return <LoadingState />;
       case 'edit':
@@ -230,7 +279,7 @@ const ConnectWallet = ({ onConnect }: { onConnect: () => void }) => {
         <p className="mt-4 font-semibold text-foreground">
           Connect your wallet to begin
         </p>
-        <p className="text-muted-foreground text-sm">You need to connect your wallet to upload a photo.</p>
+        <p className="text-muted-foreground text-sm">You need to hold at least 0.1% of POH to upload a photo.</p>
         <Button onClick={onConnect} size="lg" className="mt-6 rounded-lg py-6 text-base">
           <Wallet className="mr-2 h-5 w-5" /> Connect Wallet
         </Button>
@@ -300,6 +349,13 @@ const ImageUploader = ({ onFileSelect }: { onFileSelect: (file: File) => void })
     </Card>
   );
 };
+
+const ConnectingState = () => (
+  <div className="flex flex-col items-center justify-center p-16">
+    <LoaderCircle className="w-16 h-16 text-primary animate-spin" />
+    <p className="mt-4 text-lg text-muted-foreground">Connecting to your wallet...</p>
+  </div>
+);
 
 const LoadingState = () => (
   <div className="flex flex-col items-center justify-center p-16">
